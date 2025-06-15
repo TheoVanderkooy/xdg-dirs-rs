@@ -27,10 +27,10 @@ pub mod dirs {
     };
 
     pub const CACHE: XdgDir = XdgDir {
-        env_var: "XDG_DATA_HOME",
+        env_var: "XDG_CACHE_HOME",
         home_fallback: Some(".cache/"),
-        system_fallback_var: Some("XDG_CONFIG_DIRS"),
-        system_fallback_dirs: Some(&["/etc/xdg"]),
+        system_fallback_var: None,
+        system_fallback_dirs: None,
     };
 
     pub const STATE: XdgDir = XdgDir {

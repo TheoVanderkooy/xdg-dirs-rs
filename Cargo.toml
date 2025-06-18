@@ -1,7 +1,7 @@
 [package]
 name = "xdg-dirs-rs"
-version = "0.1.0"
-edition = "2021"
+version = "0.1.1"
+edition = "2024"
 
 [dependencies]
 serial_test = { version = "3.2.0", default-features = false }
@@ -9,3 +9,4 @@ thiserror = "2.0.12"
 
 [dev-dependencies]
 serial_test = "3.2.0"
+tempfile = "3.20.0"

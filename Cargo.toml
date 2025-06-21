@@ -1,5 +1,5 @@
 [package]
-name = "xdg-dirs-rs"
+name = "xdg-dirs"
 version = "0.1.1"
 edition = "2024"
 

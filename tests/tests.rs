@@ -1,6 +1,6 @@
 use tempfile::tempdir;
 #[cfg(test)]
-use xdg_dirs_rs::*;
+use xdg_dirs::*;
 
 use serial_test::serial;
 use std::{
@@ -158,10 +158,12 @@ fn test_xdg_location_of() {
     fs::create_dir_all(sysb.clone()).unwrap();
 
     unsafe { env::set_var("XDG_CONFIG_HOME", home_dir.clone()) };
-    unsafe { env::set_var(
-        "XDG_CONFIG_DIRS",
-        format!("{0}:{1}", sysa.display(), sysb.display()),
-    ) };
+    unsafe {
+        env::set_var(
+            "XDG_CONFIG_DIRS",
+            format!("{0}:{1}", sysa.display(), sysb.display()),
+        )
+    };
 
     let suffix = "xyz";
 

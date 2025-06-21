@@ -47,6 +47,7 @@ pub mod dirs {
 }
 
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     #[error("$HOME is not set")]
     NoHome,

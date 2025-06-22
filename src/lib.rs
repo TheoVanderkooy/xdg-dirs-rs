@@ -1,6 +1,7 @@
 use std::{env, path::PathBuf, str::FromStr};
 
 pub struct XdgDir {
+    description: &'static str,
     env_var: &'static str,
     home_fallback: Option<&'static str>,
     system_var: Option<&'static str>,
@@ -11,6 +12,7 @@ pub mod dirs {
     use super::XdgDir;
 
     pub const CONFIG: XdgDir = XdgDir {
+        description: "configuration",
         env_var: "XDG_CONFIG_HOME",
         home_fallback: Some(".config/"),
         system_var: Some("XDG_CONFIG_DIRS"),
@@ -18,6 +20,7 @@ pub mod dirs {
     };
 
     pub const DATA: XdgDir = XdgDir {
+        description: "data",
         env_var: "XDG_DATA_HOME",
         home_fallback: Some(".local/share/"),
         system_var: Some("XDG_DATA_DIRS"),
@@ -25,6 +28,7 @@ pub mod dirs {
     };
 
     pub const CACHE: XdgDir = XdgDir {
+        description: "cache",
         env_var: "XDG_CACHE_HOME",
         home_fallback: Some(".cache/"),
         system_var: None,
@@ -32,6 +36,7 @@ pub mod dirs {
     };
 
     pub const STATE: XdgDir = XdgDir {
+        description: "state",
         env_var: "XDG_STATE_HOME",
         home_fallback: Some(".local/state/"),
         system_var: None,
@@ -39,6 +44,7 @@ pub mod dirs {
     };
 
     pub const RUNTIME: XdgDir = XdgDir {
+        description: "runtime state",
         env_var: "XDG_RUNTIME_DIR",
         home_fallback: None,
         system_var: None,
@@ -55,8 +61,11 @@ pub enum Error {
     #[error("${0} is not set")]
     EnvVarNotSet(&'static str),
 
-    #[error("Path {0} not found in any available location")]
-    NotFound(String),
+    #[error("No system paths for {0}")]
+    SystemDirNotApplicable(&'static str),
+
+    #[error("Path {0} not found in any of: {1:?}")]
+    NotFound(String, Vec<String>),
 }
 
 /// Returns the user-path of a given XDG basedir, with the provided suffix, based on the relevant environment variables.
@@ -123,7 +132,11 @@ pub fn xdg_system_dirs(xdg_dir: &XdgDir, suffix: &str) -> Result<Vec<PathBuf>, E
             .collect());
     }
 
-    Err(Error::NotFound(suffix.to_string()))
+    // Otherwise, there's either nothing set or there is not intended to be a system-level fallback
+    Err(match xdg_dir.system_var {
+        Some(var) => Error::EnvVarNotSet(var),
+        None => Error::SystemDirNotApplicable(xdg_dir.description),
+    })
 }
 
 /// Search all relevant paths for the given XDG base directory and find the first one where `suffix` exists.
@@ -133,8 +146,11 @@ pub fn xdg_system_dirs(xdg_dir: &XdgDir, suffix: &str) -> Result<Vec<PathBuf>, E
 ///  - This only checks that the path exists and is accessible, not type (file vs directory) or exact permissions on the file/directory'
 ///  - Beware of TOCTOU issues
 pub fn xdg_location_of(xdg_dir: &XdgDir, suffix: &str) -> Result<PathBuf, Error> {
+    let mut checked = vec![];
+
     // Check user location
     if let Ok(user_loc) = xdg_user_dir(xdg_dir, suffix) {
+        checked.push(user_loc.to_string_lossy().to_string());
         if let Ok(user_loc) = user_loc.canonicalize() {
             if user_loc.exists() {
                 return Ok(user_loc);
@@ -145,6 +161,7 @@ pub fn xdg_location_of(xdg_dir: &XdgDir, suffix: &str) -> Result<PathBuf, Error>
     // Check system locations if not present in any user location
     if let Ok(sys_paths) = xdg_system_dirs(xdg_dir, suffix) {
         for p in sys_paths {
+            checked.push(p.to_string_lossy().to_string());
             if let Ok(p) = p.canonicalize() {
                 if p.exists() {
                     return Ok(p);
@@ -154,5 +171,5 @@ pub fn xdg_location_of(xdg_dir: &XdgDir, suffix: &str) -> Result<PathBuf, Error>
     }
 
     // Didn't find it
-    Err(Error::NotFound(suffix.to_string()))
+    Err(Error::NotFound(suffix.to_string(), checked))
 }

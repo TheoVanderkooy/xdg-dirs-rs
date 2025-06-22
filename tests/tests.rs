@@ -125,7 +125,7 @@ fn test_sys_data_dir() {
 fn test_sys_cache_dir() {
     assert_eq!(
         xdg_system_dirs(&dirs::CACHE, "test"),
-        Err(Error::NotFound("test".to_string()))
+        Err(Error::SystemDirNotApplicable("cache"))
     );
 }
 
@@ -141,17 +141,14 @@ fn test_error_display() {
 #[test]
 // Safety: serial because env var access must be single-threaded (even with different vars)
 #[serial]
-fn test_xdg_location_of() {
+fn test_xdg_location_of_config() {
     let mut test_dir = PathBuf::from(tempdir().unwrap().path());
 
-    let mut home_dir = test_dir.clone();
-    home_dir.push("home");
+    let home_dir = test_dir.join("home");
 
     test_dir.push("sys");
-    let mut sysa = test_dir.clone();
-    sysa.push("a");
-    let mut sysb = test_dir.clone();
-    sysb.push("b");
+    let sysa = test_dir.join("a");
+    let sysb = test_dir.join("b");
 
     fs::create_dir_all(home_dir.clone()).unwrap();
     fs::create_dir_all(sysa.clone()).unwrap();
@@ -168,25 +165,60 @@ fn test_xdg_location_of() {
     let suffix = "xyz";
 
     assert_eq!(
-        Err(Error::NotFound(suffix.to_string())),
+        Err(Error::NotFound(
+            suffix.to_string(),
+            vec![
+                home_dir.join(suffix).to_string_lossy().to_string(),
+                sysa.join(suffix).to_string_lossy().to_string(),
+                sysb.join(suffix).to_string_lossy().to_string()
+            ]
+        )),
         xdg_location_of(&dirs::CONFIG, suffix)
     );
 
-    let mut fb = sysb.clone();
-    fb.push(suffix);
+    let fb = sysb.join(suffix);
     File::create(fb.clone()).unwrap();
 
     assert_eq!(fb, xdg_location_of(&dirs::CONFIG, suffix).unwrap());
 
-    let mut fa = sysa.clone();
-    fa.push(suffix);
+    let fa = sysa.join(suffix);
     fs::create_dir_all(fa.clone()).unwrap();
 
     assert_eq!(fa, xdg_location_of(&dirs::CONFIG, suffix).unwrap());
 
-    let mut fh = home_dir.clone();
-    fh.push(suffix);
+    let fh = home_dir.join(suffix);
     File::create(fh.clone()).unwrap();
 
     assert_eq!(fh, xdg_location_of(&dirs::CONFIG, suffix).unwrap());
+}
+
+#[test]
+// Safety: serial because env var access must be single-threaded (even with different vars)
+#[serial]
+fn test_xdg_location_of_cache() {
+    let test_dir = PathBuf::from(tempdir().unwrap().path());
+
+    let home_dir = test_dir.join("home");
+
+    fs::create_dir_all(home_dir.clone()).unwrap();
+
+    unsafe { env::set_var("XDG_CACHE_HOME", home_dir.clone()) };
+
+    let suffix = "xyz";
+
+    let res = xdg_location_of(&dirs::CACHE, suffix);
+    assert_eq!(
+        Err(Error::NotFound(
+            suffix.to_string(),
+            vec![home_dir.join(suffix).to_string_lossy().to_string(),]
+        )),
+        res
+    );
+
+    assert_eq!(format!("Path xyz not found in any of: [\"{0}/xyz\"]", home_dir.to_string_lossy()), res.unwrap_err().to_string());
+
+    let fh = home_dir.join(suffix);
+    File::create(fh.clone()).unwrap();
+
+    assert_eq!(fh, xdg_location_of(&dirs::CACHE, suffix).unwrap());
 }
